@@ -23,8 +23,9 @@ def reduce_scatter(chunks, count, world, rank, left, right):
     s = dist.isend(chunks[chunk_to_send], dst=right)
     r = dist.irecv(new_chunk, src=left)
 
+    # As soon as we received we can update chunk, then we just have to wait to finish sending to return
     r.wait()
-    chunk[chunk_to_recv] += new_chunk
+    chunks[chunk_to_recv] += new_chunk
 
     s.wait()
     
@@ -50,7 +51,7 @@ def all_gather(chunks, count, current, world, rank, left, right):
     r = dist.irecv(new_chunk, src=left)
     r.wait()
 
-    chunk[chunk_to_recv] = new_chunk # update since new_chunk should be averaged already
+    chunks[chunk_to_recv] = new_chunk # update since new_chunk should be averaged already
 
 def ring_allreduce_(tensor: torch.Tensor, world_size = None, rankid = None):
     """In-place ring all-reduce (SUM, optional average) using isend/irecv."""

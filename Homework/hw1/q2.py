@@ -19,6 +19,15 @@ def server(params, opt, world):
     # your code here: receive gradients form worker, and add them to agg#
     #                                                                   #
     #                                                                   #
+    grad_1 = torch.empty_like(flat_grad)
+    r_1 = dist.irecv(grad_1, src=1)
+    r_1.wait()
+
+    grad_2 = torch.empty_like(flat_grad)
+    r_2 = dist.irecv(grad_2, src=2)
+
+    print("grad_1", grad_1.shape)
+    print("grad_2", grad_2.shape)
 
     synced_grads = _unflatten_dense_tensors(agg, [p.grad for p in params])
     # ---- set averaged grads locally & step ----
@@ -37,8 +46,11 @@ def server(params, opt, world):
 def worker(params):
     print("params", len(params))
     flat_grad = _flatten_dense_tensors([p.grad for p in params]).contiguous()
-    print("flat_grads", flat_grads.shape)
+    print("flat_grads", flat_grad.shape)
     # ---- push grads to server ----
+
+    s = dist.isend(flat_grad, dst=0)
+    s.wait()
 
     #                                                                   #
     #                                                                   #

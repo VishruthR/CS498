@@ -72,6 +72,7 @@ def ring_allreduce_(tensor: torch.Tensor, world_size = None, rankid = None):
     #                                                                   #
     #So, fill zeros at the end of flat to generate padded_flat
     padding_needed = world_size - (n % world_size)
+    padding_needed = 0 if padding_needed == world_size else padding_needed
     flat.resize_(padding_needed + n)
     flat[n:] = 0
     # create new view of flat

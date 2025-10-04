@@ -87,7 +87,7 @@ def ring_allreduce_(tensor: torch.Tensor, world_size = None, rankid = None):
     # You may adjust the function signature (input structure) of `reduce_scatter` and `all_gather` if needed.
     for i in range(world - 1):
         print(f"reduce_scatter {i}")
-        reduce_scatter(cunks, i, world, rank, left, right)
+        reduce_scatter(chunks, i, world, rank, left, right)
 
     for i in range(world - 1):
         print(f"all_gather {i}")

@@ -26,13 +26,33 @@ def reduce_scatter(chunks, count, world, rank, left, right):
     chunk[chunk_to_recv] += new_chunk
     
         
-def all_gather(chunks, tmp, current, world, rank, left, right):
+def all_gather(chunks, count, current, world, rank, left, right):
     #                                                                   #
     #                                                                   #
     # your code here: follow slides instruction: do counter-clockwise iteration
     #                                                                   #
     #                                                                   #
-    return
+    # first iter, chunk rank + 1 % world is done
+    # send that off to right
+    # recv chunk rank % world from left
+    # when you receive all gather, update the chunk and divide by world size
+    # chunk rank + 1 - count % world gets sent to right
+    # recv chunk rank - count % world from left
+    # TODO: Do we need to do opt.step to get new params? I don't even know if we're working with grads
+    chunk_to_send = (rank + 1 - count) % world
+    if count == 0:
+        # on first iter of all gather, average grads
+        chunks[chunk_to_send] /= world
+
+    s = dist.isend(chunks[chunk_to_send], dst=right)
+    s.wait()
+
+    chunk_to_recv = (rank - count) % world
+    new_chunk = torch.empty_like(chunks[0])
+    r = dist.irecv(new_chunk, src=left)
+    r.wait()
+
+    chunk[chunk_to_recv] = new_chunk # update since new_chunk should be averaged already
 
 def ring_allreduce_(tensor: torch.Tensor, world_size = None, rankid = None):
     """In-place ring all-reduce (SUM, optional average) using isend/irecv."""
@@ -68,6 +88,10 @@ def ring_allreduce_(tensor: torch.Tensor, world_size = None, rankid = None):
     for i in range(world - 1):
         print(f"reduce_scatter {i}")
         reduce_scatter(cunks, i, world, rank, left, right)
+
+    for i in range(world - 1):
+        print(f"all_gather {i}")
+        all_gather(chunks, i, world, rank, left, right)
 
 
     # stitch & unpad  

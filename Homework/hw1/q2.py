@@ -7,7 +7,7 @@ import torch.distributed as dist
 
 def server(params, opt, world):
     # ---- aggregate grads from workers ----
-    print("params", params.shape)
+    print("params", len(params))
     flat_grad = _flatten_dense_tensors([p.grad for p in params]).contiguous() #usage: tranfer a list tensor to one 1-D tensor
     print("flat_grad", flat_grad.shape)
     ##here, you should generate one big 1-D tensor containing all parameters to make the transfer process easy
@@ -35,7 +35,7 @@ def server(params, opt, world):
     #                                                                   #
 
 def worker(params):
-    print("params", params.shape)
+    print("params", len(params))
     flat_grad = _flatten_dense_tensors([p.grad for p in params]).contiguous()
     print("flat_grads", flat_grads.shape)
     # ---- push grads to server ----

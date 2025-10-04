@@ -13,14 +13,24 @@ def reduce_scatter(chunks, count, world, rank, left, right):
     #                                                                   #
     #                                                                   #
     # TODO: Remove waits to optimize comm-compute overlap
-    chunk_to_send = (rank - count) % world
-    s = dist.isend(chunks[chunk_to_send], dst=right)
-    s.wait()
-
-    chunk_to_recv = (rank - count - 1) % world
+    # TODO: Fix deadlock
+    # even should send, odd receive
+    # then switch it
     new_chunk = torch.empty_like(chunks[0])
-    r = dist.irecv(new_chunk, src=left)
-    r.wait()
+    chunk_to_send = (rank - count) % world
+    chunk_to_recv = (rank - count - 1) % world
+    if count % 2 == 0:
+        s = dist.isend(chunks[chunk_to_send], dst=right)
+        s.wait()
+        
+        r = dist.irecv(new_chunk, src=left)
+        r.wait()
+    else:
+        r = dist.irecv(new_chunk, src=left)
+        r.wait()
+
+        s = dist.isend(chunks[chunk_to_send], dst=right)
+        s.wait()
 
     # update chunk
     chunk[chunk_to_recv] += new_chunk
@@ -35,15 +45,10 @@ def all_gather(chunks, count, current, world, rank, left, right):
     # first iter, chunk rank + 1 % world is done
     # send that off to right
     # recv chunk rank % world from left
-    # when you receive all gather, update the chunk and divide by world size
+    # when you receive all gather, update the chunk
     # chunk rank + 1 - count % world gets sent to right
     # recv chunk rank - count % world from left
-    # TODO: Do we need to do opt.step to get new params? I don't even know if we're working with grads
     chunk_to_send = (rank + 1 - count) % world
-    if count == 0:
-        # on first iter of all gather, average grads
-        chunks[chunk_to_send] /= world
-
     s = dist.isend(chunks[chunk_to_send], dst=right)
     s.wait()
 
@@ -74,8 +79,10 @@ def ring_allreduce_(tensor: torch.Tensor, world_size = None, rankid = None):
     #                                                                   #
     #So, fill zeros at the end of flat to generate padded_flat
     padding_needed = world_size - (n % world_size)
-    padded_flat = F.pad(flat, pad=(0, padding_needed), value=0)
-    chunks = [padded_flat[i*chunk:(i+1)*chunk] for i in range(world)]
+    flat.resize_(padding_needed + n)
+    flat[n:] = 0
+    # create new view of flat
+    chunks = [flat[i*chunk:(i+1)*chunk] for i in range(world)]
 
     #                                                                   #
     #                                                                   #
@@ -93,8 +100,8 @@ def ring_allreduce_(tensor: torch.Tensor, world_size = None, rankid = None):
         print(f"all_gather {i}")
         all_gather(chunks, i, world, rank, left, right)
 
-
-    # stitch & unpad  
+    # opt step is done for us
+    # stitch & unpad
     flat /= world
     tensor.view(-1).copy_(flat[:n])
     return

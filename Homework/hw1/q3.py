@@ -4,14 +4,27 @@
 from torch._utils import _flatten_dense_tensors, _unflatten_dense_tensors
 import torch
 import torch.distributed as dist
+import torch.nn.functional as F
 
-def reduce_scatter(chunks, tmp, world, rank, left, right):
+def reduce_scatter(chunks, count, world, rank, left, right):
     #                                                                   #
     #                                                                   #
     # your code here: follow slides instruction: do counter-clockwise iteration
     #                                                                   #
     #                                                                   #
-    return
+    # TODO: Remove waits to optimize comm-compute overlap
+    chunk_to_send = (rank - count) % world
+    s = dist.isend(chunks[chunk_to_send], dst=left)
+    s.wait()
+
+    chunk_to_recv = (rank - count - 1) % world
+    new_chunk = torch.empty_like(chunks[0])
+    r = dist.irecv(new_chunk, src=right)
+    r.wait()
+
+    # update chunk
+    chunk[chunk_to_recv] += new_chunk
+    
         
 def all_gather(chunks, tmp, current, world, rank, left, right):
     #                                                                   #
@@ -40,7 +53,8 @@ def ring_allreduce_(tensor: torch.Tensor, world_size = None, rankid = None):
     #                                                                   #
     #                                                                   #
     #So, fill zeros at the end of flat to generate padded_flat
-    padded_flat = None # modify this line and fill correct value into padded_flat
+    padding_needed = world_size - (n % world_size)
+    padded_flat = F.pad(flat, pad=(0, padding_needed), value=0)
     chunks = [padded_flat[i*chunk:(i+1)*chunk] for i in range(world)]
 
     #                                                                   #
@@ -51,7 +65,11 @@ def ring_allreduce_(tensor: torch.Tensor, world_size = None, rankid = None):
     #                                                                   #
     #we provide the reduce_scatter and all_gather func prototype for you
     # You may adjust the function signature (input structure) of `reduce_scatter` and `all_gather` if needed.
-    
+    for i in range(world - 1):
+        print(f"reduce_scatter {i}")
+        reduce_scatter(cunks, i, world, rank, left, right)
+
+
     # stitch & unpad  
     flat /= world
     tensor.view(-1).copy_(flat[:n])

@@ -29,6 +29,11 @@ def server(params, opt, world):
     print("grad_1", grad_1.shape)
     print("grad_2", grad_2.shape)
 
+    # TODO: May cause issues with autograd
+    agg += grad_1
+    agg += grad_2
+    agg /= 3
+
     synced_grads = _unflatten_dense_tensors(agg, [p.grad for p in params])
     # ---- set averaged grads locally & step ----
     for g, s in zip([p.grad for p in params], synced_grads):
@@ -37,11 +42,17 @@ def server(params, opt, world):
 
     # ---- broadcast updated params for this subset ----
     flat_param = _flatten_dense_tensors([p.data for p in params]).contiguous()
+    print("flat param", flat_param.shape)
     #                                                                   #
     #                                                                   #
     # your code here: send packed 1-D parameter tensor to all workers   #
     #                                                                   #
     #                                                                   #
+    s_1 = dist.isend(flat_param, dst=1)
+    s_1.wait()
+
+    s_2 = dist.isend(flat_param, dst=2)
+    s_2.wait()
 
 def worker(params):
     print("params", len(params))
@@ -49,14 +60,13 @@ def worker(params):
     print("flat_grads", flat_grad.shape)
     # ---- push grads to server ----
 
-    s = dist.isend(flat_grad, dst=0)
-    s.wait()
-
     #                                                                   #
     #                                                                   #
     # your code here: send packed 1-D gradient to server
     #                                                                   #
     #                                                                   #
+    s = dist.isend(flat_grad, dst=0)
+    s.wait()
 
     # ---- receive updated params, write into local model ----
     
@@ -65,7 +75,11 @@ def worker(params):
     # your code here: please get correct 1-D packed parameter from server
     #           And then unpacked it and store in synced_params
     #                                                                   #
-    synced_params = None #you should  assign correct value for synced_params#
+    new_params = torch.empty_like(flat_grad)
+    r = dist.irecv(new_params, src=0)
+    r.wait()
+
+    synced_params = _unflatten_dense_tensors(new_params, [p.data for p in params])
 
 
     # ---- syncronize the parameters ----

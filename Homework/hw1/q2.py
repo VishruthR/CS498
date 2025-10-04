@@ -7,9 +7,12 @@ import torch.distributed as dist
 
 def server(params, opt, world):
     # ---- aggregate grads from workers ----
+    print("params", params)
     flat_grad = _flatten_dense_tensors([p.grad for p in params]).contiguous() #usage: tranfer a list tensor to one 1-D tensor
+    print("flat_grad", flat_grad)
     ##here, you should generate one big 1-D tensor containing all parameters to make the transfer process easy
     agg = flat_grad.clone() #agg as a aggregated counter to record sum gradients
+    print("agg", agg)
 
     #                                                                   #
     #                                                                   #

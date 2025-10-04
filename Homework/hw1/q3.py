@@ -14,12 +14,12 @@ def reduce_scatter(chunks, count, world, rank, left, right):
     #                                                                   #
     # TODO: Remove waits to optimize comm-compute overlap
     chunk_to_send = (rank - count) % world
-    s = dist.isend(chunks[chunk_to_send], dst=left)
+    s = dist.isend(chunks[chunk_to_send], dst=right)
     s.wait()
 
     chunk_to_recv = (rank - count - 1) % world
     new_chunk = torch.empty_like(chunks[0])
-    r = dist.irecv(new_chunk, src=right)
+    r = dist.irecv(new_chunk, src=left)
     r.wait()
 
     # update chunk

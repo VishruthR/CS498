@@ -49,7 +49,8 @@ def all_gather(chunks, count, world, rank, left, right):
     # directly update the chunk when you receive it
     r = dist.irecv(chunks[chunk_to_recv], src=left)
 
-    torch.futures.wait_all([s, r])
+    r.wait()
+    s.wait()
 
 def ring_allreduce_(tensor: torch.Tensor, world_size = None, rankid = None):
     """In-place ring all-reduce (SUM, optional average) using isend/irecv."""

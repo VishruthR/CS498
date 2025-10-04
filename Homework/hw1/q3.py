@@ -19,21 +19,14 @@ def reduce_scatter(chunks, count, world, rank, left, right):
     new_chunk = torch.empty_like(chunks[0])
     chunk_to_send = (rank - count) % world
     chunk_to_recv = (rank - count - 1) % world
-    if count % 2 == 0:
-        s = dist.isend(chunks[chunk_to_send], dst=right)
-        s.wait()
-        
-        r = dist.irecv(new_chunk, src=left)
-        r.wait()
-    else:
-        r = dist.irecv(new_chunk, src=left)
-        r.wait()
 
-        s = dist.isend(chunks[chunk_to_send], dst=right)
-        s.wait()
+    s = dist.isend(chunks[chunk_to_send], dst=right)
+    r = dist.irecv(new_chunk, src=left)
 
-    # update chunk
+    r.wait()
     chunk[chunk_to_recv] += new_chunk
+
+    s.wait()
     
         
 def all_gather(chunks, count, current, world, rank, left, right):

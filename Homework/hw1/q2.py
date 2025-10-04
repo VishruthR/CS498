@@ -30,6 +30,7 @@ def server(params, opt, world):
     print("grad_2", grad_2.shape)
 
     # TODO: May cause issues with autograd
+    # Finding average
     agg += grad_1
     agg += grad_2
     agg /= 3

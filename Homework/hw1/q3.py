@@ -1,6 +1,11 @@
 ###Q3: allreduce###
 ###please implement ring_allreduce method, using  pytorch's dist method is not allowed###
 
+"""
+Vishruth Raj
+vmraj2
+"""
+
 from torch._utils import _flatten_dense_tensors, _unflatten_dense_tensors
 import torch
 import torch.distributed as dist
